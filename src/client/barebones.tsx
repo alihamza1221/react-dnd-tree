@@ -1,5 +1,5 @@
 import React, { Children, useState } from "react";
-import DndTree from "../react-dnd-tree";
+import { DndTree } from "../react-dnd-tree";
 // In your own app, you would need to use import styles once in the app
 // import 'react-sortable-tree/styles.css';
 
