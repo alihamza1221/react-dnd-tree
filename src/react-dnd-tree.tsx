@@ -1,9 +1,29 @@
 import { DndProvider, DndContext } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-export const defaultGetNodeKey = ({ treeIndex }: TreeIndex) => treeIndex;
+import TreeNode, { TreeNode as typeTreeNode } from "./tree-node-render";
+import DndWrapper from "./wrapper";
+import { useState } from "react";
 
+export const defaultGetNodeKey = ({ treeIndex }: any) => treeIndex;
+let idCount = 0;
+const getMaxDepth = (treeData: typeTreeNode[]) => {
+  let maxDepth = 0;
+  const traverse = (node: typeTreeNode, depth: number) => {
+    if (node.children) {
+      node.children.forEach((child) => {
+        traverse(child, depth + 1);
+      });
+    }
+    maxDepth = Math.max(maxDepth, depth);
+  };
+  treeData.forEach((node) => {
+    traverse(node, 1);
+  });
+  return maxDepth;
+};
 const ReactDndTree: React.FC<ReactDndTreeProps> = (
   {
+    treeData,
     canDrag = true,
     canDrop = undefined,
     canNodeHaveChildren = () => true,
@@ -17,7 +37,48 @@ const ReactDndTree: React.FC<ReactDndTreeProps> = (
   },
   ...props
 ) => {
-  return <></>;
+  const renderTreeNode = (
+    node: typeTreeNode,
+    treeIndex: number,
+    treeMaxDepth: number,
+    parent: typeTreeNode | undefined = undefined,
+    prevPath: number[] = [],
+
+    nodes: ReturnType<typeof TreeNode>[] = []
+  ) => {
+    idCount += 1;
+    const path = [...prevPath, idCount];
+    nodes.push(
+      <TreeNode
+        {...node}
+        treeIndex={treeIndex}
+        id={idCount}
+        path={path}
+        parent={parent}
+        maxDepth={treeMaxDepth}
+        scaffoldBlockPxWidth={44}
+        treeData={treeData}
+      />
+    );
+    if (node.children) {
+      node.children.forEach((child) => {
+        nodes.push(
+          ...renderTreeNode(child, treeIndex + 1, treeMaxDepth, node, [...path])
+        );
+      });
+      return nodes;
+    }
+    return nodes;
+  };
+  const treeMaxDepth = getMaxDepth(treeData);
+  const [treeDataState, setTreeDataState] = useState(null);
+  return (
+    <>
+      <DndWrapper>
+        {treeData.map((node) => renderTreeNode(node, 0, treeMaxDepth))}
+      </DndWrapper>
+    </>
+  );
 };
 export const DndTreeWithoutDndContext = (props: ReactDndTreeProps) => {
   return (

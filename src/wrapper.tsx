@@ -1,12 +1,11 @@
-import React from "react";
+import React, { useRef } from "react";
 import { ItemType, TreeNode } from "./tree-node-render";
-import { useDrag, DragSourceMonitor, useDrop } from "react-dnd";
+import { useDrag, DragSourceMonitor, useDrop, XYCoord } from "react-dnd";
 export type TreeNodeWrapProps = {
-  node: TreeNode;
   children: React.ReactNode;
 
-  canDrag: boolean;
-  canDrop: boolean;
+  canDrag?: boolean;
+  canDrop?: boolean;
 };
 export type TreeNodeDropResult = {
   node: TreeNode;
@@ -17,55 +16,43 @@ export type TreeNodeDropResult = {
   nextParent: TreeNode;
   nextTreeIndex: number;
 };
-const NodeWrapper: React.FC<TreeNodeWrapProps> = (props) => {
-  const [{ isDragging }, drag] = useDrag({
-    type: ItemType.TREE_NODE,
-    item: { ...props.node },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-    end(draggedItem, monitor: DragSourceMonitor) {
-      if (monitor.didDrop()) {
-        const dropResult = monitor.getDropResult<TreeNodeDropResult>();
-        if (dropResult) {
-          console.log(
-            `You dropped ${draggedItem.title} into ${dropResult?.node.title}!`
-          );
-        }
-      }
-    },
-  });
+const DndWrapper: React.FC<TreeNodeWrapProps> = (props) => {
+  const ref = useRef<HTMLDivElement>(null);
 
   const [{ isOver }, drop] = useDrop({
     accept: ItemType.TREE_NODE,
     drop: (item: TreeNode, monitor) => {
-      const initClientOffSet = monitor.getInitialClientOffset();
-      const clientOffSet = monitor.getClientOffset();
-      if (initClientOffSet && clientOffSet)
-        console.log(
-          "initClientOffSet",
-          initClientOffSet?.x,
-          "clientOffSet",
-          clientOffSet?.x,
-          "\n diff : ",
-          initClientOffSet.x - clientOffSet.x
-        );
+      console.log("drop", item);
+
+      let blocksOffset = Math.round(
+        //@ts-ignore
+        monitor.getDifferenceFromInitialOffset()?.x / 44
+      );
+      console.log("blocksOffset", blocksOffset);
       return {
         node: item,
-        prevPath: item.path,
-        prevParent: item.parentNode,
-        prevTreeIndex: item.treeIndex,
-        nextPath: props.node.path,
-        nextParent: props.node,
-        nextTreeIndex: props.node.treeIndex,
       };
     },
+
     collect: (monitor) => ({
-      isOver: monitor.isOver(),
+      isOver: monitor.isOver({ shallow: true }),
+      isOverShallow: monitor.isOver({ shallow: true }),
     }),
   });
+  drop(ref);
 
-  return <div></div>;
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: "relative",
+        backgroundColor: isOver ? "green" : "white",
+      }}
+    >
+      wrapper
+      {props.children}
+    </div>
+  );
 };
 
-export default NodeWrapper;
+export default DndWrapper;
