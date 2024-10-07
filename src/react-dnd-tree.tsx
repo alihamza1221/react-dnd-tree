@@ -5,7 +5,7 @@ import DndWrapper from "./wrapper";
 import { useState } from "react";
 
 export const defaultGetNodeKey = ({ treeIndex }: any) => treeIndex;
-let idCount = 0;
+
 const getMaxDepth = (treeData: typeTreeNode[]) => {
   let maxDepth = 0;
   const traverse = (node: typeTreeNode, depth: number) => {
@@ -24,6 +24,7 @@ const getMaxDepth = (treeData: typeTreeNode[]) => {
 const ReactDndTree: React.FC<ReactDndTreeProps> = (
   {
     treeData,
+    onChange,
     canDrag = true,
     canDrop = undefined,
     canNodeHaveChildren = () => true,
@@ -37,6 +38,7 @@ const ReactDndTree: React.FC<ReactDndTreeProps> = (
   },
   ...props
 ) => {
+  let idCount = -1;
   const renderTreeNode = (
     node: typeTreeNode,
     treeIndex: number,
@@ -57,7 +59,9 @@ const ReactDndTree: React.FC<ReactDndTreeProps> = (
         parent={parent}
         maxDepth={treeMaxDepth}
         scaffoldBlockPxWidth={44}
+        canDrag={true}
         treeData={treeData}
+        onChange={onChange}
       />
     );
     if (node.children) {

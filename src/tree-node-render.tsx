@@ -1,6 +1,26 @@
 import React, { useRef } from "react";
 import { useDrag, DragSourceMonitor, useDrop, XYCoord } from "react-dnd";
 
+function getDescendantCount({
+  node,
+  ignoreCollapsed,
+}: {
+  node: any;
+  ignoreCollapsed: boolean;
+}): number {
+  if (!node.children || (ignoreCollapsed && node.expanded === false)) {
+    return 0;
+  }
+
+  let count = 0;
+  for (let i = 0; i < node.children.length; i++) {
+    count +=
+      1 + getDescendantCount({ node: node.children[i], ignoreCollapsed });
+  }
+
+  return count;
+}
+
 export type TreeNode = {
   children?: TreeNode[];
   id?: number;
@@ -17,6 +37,7 @@ export type TreeNode = {
   scaffoldBlockPxWidth?: number;
   maxDepth?: number;
   treeData: TreeNode[];
+  onChange: (treeData: TreeNode[]) => void;
 
   [key: string]: any;
 };
@@ -24,7 +45,7 @@ export type TreeNode = {
 type changeNodeAtPathParams = {
   treeData: TreeNode[];
   path: number[];
-  newNode: TreeNode | undefined;
+  newNode: any | undefined;
   ignoreCollapsed?: boolean;
 };
 export const changeNodeAtPath = ({
@@ -33,14 +54,7 @@ export const changeNodeAtPath = ({
   newNode,
   ignoreCollapsed = true,
 }: changeNodeAtPathParams) => {
-  console.log(
-    "props: treeData: ",
-    treeData,
-    "path: ",
-    path,
-    "newNode: ",
-    newNode
-  );
+  console.log("path:", path, "treeData: ", treeData, "newNode: ", newNode);
   const RESULT_MISS = "RESULT_MISS";
 
   //@ts-ignore
@@ -51,19 +65,19 @@ export const changeNodeAtPath = ({
     pathIndex,
   }: {
     isPseudoRoot?: boolean;
-    node: TreeNode;
+    node: any;
     currentTreeIndex: number;
     pathIndex: number;
   }) => {
     console.log(
-      "node: ",
-      node,
-      "currentTreeIndex: ",
+      "pathId: ",
+      path[pathIndex],
+      "curTreeidx:",
       currentTreeIndex,
-      "pathIndex: ",
-      pathIndex
+      console.log(node)
     );
-    if (!isPseudoRoot && node.path[currentTreeIndex] !== path[pathIndex]) {
+
+    if (!isPseudoRoot && currentTreeIndex !== path[pathIndex]) {
       return RESULT_MISS;
     }
 
@@ -79,28 +93,52 @@ export const changeNodeAtPath = ({
     let nextTreeIndex = currentTreeIndex + 1;
 
     for (let i = 0; i < node.children.length; i += 1) {
+      if (node.children[i]?.isAdded === true) {
+        console.log("conitnue....", node.children[i]);
+        node.children[i].isAdded = false;
+        continue;
+      }
       //@ts-ignore
       const result = traverse({
         node: node.children[i],
         currentTreeIndex: nextTreeIndex,
         pathIndex: pathIndex + 1,
       });
-      console.log("result: ", result);
 
       // If the result went down the correct path
       if (result !== RESULT_MISS) {
         if (result) {
           // If the result was truthy (in this case, an object),
           //  pass it to the next level of recursion up
-          return {
+          console.log(
+            "i: ",
+            i,
+            "...node",
+            node,
+            "node.children.slice[0, i]: ",
+            node.children.slice(0, i),
+            "result: ",
+            result,
+            "node.children.slice[i + 1]: ",
+            node.children.slice(i + 1)
+          );
+          const temp = {res:{
             ...node,
             children: [
-              ...node.children.slice(0, i),
+              ...node.children.slice(0, i +1),
               result,
               ...node.children.slice(i + 1),
             ],
-          };
-        }
+          }, status: "Updated"};
+          console.log("temp: ", temp, "i: ", i);
+          return {res:{
+            ...node,
+            children: [
+              ...node.children.slice(0, i +1),
+              result,
+              ...node.children.slice(i + 1),
+            ],
+          }, status: "Updated"};
         // If the result was falsy (returned from the newNode function), then
         //  delete the node from the array.
         return {
@@ -111,6 +149,10 @@ export const changeNodeAtPath = ({
           ],
         };
       }
+
+      const temp = nextTreeIndex;
+      nextTreeIndex +=
+        1 + getDescendantCount({ node: node.children[i], ignoreCollapsed });
     }
   }; //@ts-ignore
   const result = traverse({
@@ -124,6 +166,7 @@ export const changeNodeAtPath = ({
     throw new Error("No node found at the given path.");
   }
 
+  console.log("res org: ", result.children);
   return result.children;
 };
 
@@ -178,18 +221,23 @@ const TreeNode: React.FC<TreeNode> = (props) => {
       }
       if (!props.treeData) return;
 
+      const draggedItem = { ...draggeditem, isAdded: true };
       let res = changeNodeAtPath({
         treeData: props.treeData,
         path: props.path,
-        newNode: draggeditem,
+        newNode: draggedItem,
       });
-      console.log("res1: ", res);
+
       res = changeNodeAtPath({
-        treeData: props.treeData,
+        treeData: res,
         path: draggeditem.path,
         newNode: undefined,
       });
-      console.log("res2: ", res);
+
+      console.log("onchange:", props.onChange);
+
+      props.onChange(res);
+      console.log("res: ", res);
     },
     // hover: (draggedItem, moniter) => {
     //   if (!ref.current) return;
