@@ -1,6 +1,30 @@
-import React, { useRef } from "react";
+import React, { Children, useRef } from "react";
 import { useDrag, DragSourceMonitor, useDrop, XYCoord } from "react-dnd";
 
+function isGreaterTreeDepth({
+  draggedItemPath,
+  targetItemPath,
+}: {
+  draggedItemPath: number[];
+  targetItemPath: number[];
+}): boolean {
+  let isGreater = false;
+  let i = 0;
+  while (i < draggedItemPath.length && i < targetItemPath.length) {
+    if (draggedItemPath[i] > targetItemPath[i]) {
+      isGreater = true;
+      break;
+    } else if (draggedItemPath[i] < targetItemPath[i]) {
+      isGreater = false;
+      break;
+    }
+    i++;
+  }
+  if (draggedItemPath.length > targetItemPath.length) {
+    isGreater = true;
+  }
+  return isGreater;
+}
 function getDescendantCount({
   node,
   ignoreCollapsed,
@@ -74,7 +98,8 @@ export const changeNodeAtPath = ({
       path[pathIndex],
       "curTreeidx:",
       currentTreeIndex,
-      console.log(node)
+      "node",
+      node
     );
 
     if (!isPseudoRoot && currentTreeIndex !== path[pathIndex]) {
@@ -93,52 +118,49 @@ export const changeNodeAtPath = ({
     let nextTreeIndex = currentTreeIndex + 1;
 
     for (let i = 0; i < node.children.length; i += 1) {
-      if (node.children[i]?.isAdded === true) {
-        console.log("conitnue....", node.children[i]);
-        node.children[i].isAdded = false;
-        continue;
-      }
       //@ts-ignore
       const result = traverse({
         node: node.children[i],
         currentTreeIndex: nextTreeIndex,
         pathIndex: pathIndex + 1,
       });
-
+      console.log("res: ", result);
       // If the result went down the correct path
       if (result !== RESULT_MISS) {
         if (result) {
           // If the result was truthy (in this case, an object),
           //  pass it to the next level of recursion up
+
+          if (result.newNode) {
+            console.log("res.newNode block");
+            return {
+              ...node,
+              children: [
+                ...node.children.slice(0, i + 1),
+                { ...result, newNode: false },
+                ...node.children.slice(i + 1),
+              ],
+            };
+          }
           console.log(
             "i: ",
             i,
             "...node",
             node,
-            "node.children.slice[0, i]: ",
+            "res",
             node.children.slice(0, i),
-            "result: ",
             result,
-            "node.children.slice[i + 1]: ",
             node.children.slice(i + 1)
           );
-          const temp = {res:{
+          return {
             ...node,
             children: [
-              ...node.children.slice(0, i +1),
+              ...node.children.slice(0, i),
               result,
               ...node.children.slice(i + 1),
             ],
-          }, status: "Updated"};
-          console.log("temp: ", temp, "i: ", i);
-          return {res:{
-            ...node,
-            children: [
-              ...node.children.slice(0, i +1),
-              result,
-              ...node.children.slice(i + 1),
-            ],
-          }, status: "Updated"};
+          };
+        }
         // If the result was falsy (returned from the newNode function), then
         //  delete the node from the array.
         return {
@@ -150,7 +172,6 @@ export const changeNodeAtPath = ({
         };
       }
 
-      const temp = nextTreeIndex;
       nextTreeIndex +=
         1 + getDescendantCount({ node: node.children[i], ignoreCollapsed });
     }
@@ -221,59 +242,47 @@ const TreeNode: React.FC<TreeNode> = (props) => {
       }
       if (!props.treeData) return;
 
-      const draggedItem = { ...draggeditem, isAdded: true };
+      const draggedItem = { ...draggeditem, newNode: true };
       let res = changeNodeAtPath({
         treeData: props.treeData,
         path: props.path,
         newNode: draggedItem,
       });
-
+      function getPrevIdx() {
+        console.log(
+          "draggeditem.treeIndex:",
+          draggeditem.treeIndex,
+          "props.treeIndex:",
+          props.treeIndex
+        );
+        if (
+          !isGreaterTreeDepth({
+            draggedItemPath: draggeditem.path,
+            targetItemPath: props.path,
+          })
+        ) {
+          return draggeditem.path;
+        }
+        const descendantCount = getDescendantCount({
+          node: draggedItem,
+          ignoreCollapsed: true,
+        });
+        const addedNodePrevIdx = draggedItem.path.map(
+          (x) => x + 1 + descendantCount
+        );
+        return addedNodePrevIdx;
+      }
+      const addedNodePrevIdx = getPrevIdx();
       res = changeNodeAtPath({
         treeData: res,
-        path: draggeditem.path,
+        path: addedNodePrevIdx,
         newNode: undefined,
       });
-
-      console.log("onchange:", props.onChange);
 
       props.onChange(res);
       console.log("res: ", res);
     },
-    // hover: (draggedItem, moniter) => {
-    //   if (!ref.current) return;
-    //   const hoverBoundingRect = ref.current?.getBoundingClientRect();
-
-    //   // Get vertical middle
-    //   const hoverMiddleY =
-    //     (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
-    //   const clientOffset = moniter.getClientOffset() as XYCoord;
-
-    //   const hoverClientY = clientOffset.y - hoverBoundingRect.top;
-    //   const hoverId = props.node.id;
-    //   if (!hoverId || !draggedItem.id) return;
-    //   if (hoverId < draggedItem.id && hoverClientY < hoverMiddleY) return;
-    //   if (hoverId > draggedItem.id && hoverClientY > hoverMiddleY) return;
-
-    //   console.log("hovering...");
-    //   // get cur difference b/w initial and current position in x-axis
-
-    //   let clientDepthoffset =
-    //     moniter.getDifferenceFromInitialOffset() as XYCoord;
-
-    //   const initialClientOffset = moniter.getInitialClientOffset() as XYCoord;
-
-    //   if (clientOffset.x > initialClientOffset.x) {
-    //     if (draggedItem?.minDepthWidth)
-    //       clientDepthoffset.x += draggedItem?.minDepthWidth;
-    //   }
-
-    //   let scaffoldBlockPxWidth = draggedItem?.scaffoldBlockPxWidth || 44;
-    //   const curMinDepth =
-    //     (clientDepthoffset as XYCoord).x / scaffoldBlockPxWidth;
-
-    //   if (curMinDepth < 0) return;
-    //   //get max depth
-    // },
+    hover: (draggedItem, moniter) => {},
     collect: (monitor) => ({
       isOver: monitor.isOver(),
     }),
