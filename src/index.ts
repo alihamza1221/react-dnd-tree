@@ -1,1 +1,1 @@
-export { DndTree, DndTreeWithoutDndContext } from "./react-dnd-tree";
+export { DndTree as default, DndTreeWithoutDndContext } from "./react-dnd-tree";

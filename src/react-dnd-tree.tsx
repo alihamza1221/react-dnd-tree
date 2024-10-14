@@ -52,6 +52,7 @@ const ReactDndTree: React.FC<ReactDndTreeProps> = (
     const path = [...prevPath, idCount];
     nodes.push(
       <TreeNode
+        key={path.join(".")}
         {...node}
         treeIndex={treeIndex}
         id={idCount}

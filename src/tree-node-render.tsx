@@ -1,5 +1,6 @@
 import React, { Children, useRef } from "react";
 import { useDrag, DragSourceMonitor, useDrop, XYCoord } from "react-dnd";
+import TreeDragLayer from "./tree-drag-preview";
 
 function isGreaterTreeDepth({
   draggedItemPath,
@@ -7,23 +8,28 @@ function isGreaterTreeDepth({
 }: {
   draggedItemPath: number[];
   targetItemPath: number[];
-}): boolean {
-  let isGreater = false;
+}): { isGreater: boolean; idx: number } {
+  console.log(
+    "draggedItemPath: ",
+    draggedItemPath,
+    "targetItemPath: ",
+    targetItemPath
+  );
+
   let i = 0;
   while (i < draggedItemPath.length && i < targetItemPath.length) {
     if (draggedItemPath[i] > targetItemPath[i]) {
-      isGreater = true;
-      break;
+      return { isGreater: true, idx: i };
     } else if (draggedItemPath[i] < targetItemPath[i]) {
-      isGreater = false;
-      break;
+      return { isGreater: false, idx: i };
     }
     i++;
   }
   if (draggedItemPath.length > targetItemPath.length) {
-    isGreater = true;
+    return { isGreater: true, idx: draggedItemPath.length };
+    console.log(".........true");
   }
-  return isGreater;
+  return { isGreater: false, idx: 0 };
 }
 function getDescendantCount({
   node,
@@ -93,15 +99,6 @@ export const changeNodeAtPath = ({
     currentTreeIndex: number;
     pathIndex: number;
   }) => {
-    console.log(
-      "pathId: ",
-      path[pathIndex],
-      "curTreeidx:",
-      currentTreeIndex,
-      "node",
-      node
-    );
-
     if (!isPseudoRoot && currentTreeIndex !== path[pathIndex]) {
       return RESULT_MISS;
     }
@@ -130,9 +127,26 @@ export const changeNodeAtPath = ({
         if (result) {
           // If the result was truthy (in this case, an object),
           //  pass it to the next level of recursion up
+          if (result.addAsChild && result.newNode) {
+            delete result.addAsChild;
+            delete result.newNode;
 
-          if (result.newNode) {
-            console.log("res.newNode block");
+            return {
+              ...node,
+              children: [
+                ...node.children.slice(0, i),
+                {
+                  ...node.children[i],
+                  children: [
+                    ...(node.children[i]?.children || []),
+                    { ...result, newNode: false, addAsChild: false },
+                  ],
+                },
+                ...node.children.slice(i + 1),
+              ],
+            };
+          } else if (result.newNode) {
+            delete result.newNode;
             return {
               ...node,
               children: [
@@ -142,16 +156,7 @@ export const changeNodeAtPath = ({
               ],
             };
           }
-          console.log(
-            "i: ",
-            i,
-            "...node",
-            node,
-            "res",
-            node.children.slice(0, i),
-            result,
-            node.children.slice(i + 1)
-          );
+
           return {
             ...node,
             children: [
@@ -187,7 +192,6 @@ export const changeNodeAtPath = ({
     throw new Error("No node found at the given path.");
   }
 
-  console.log("res org: ", result.children);
   return result.children;
 };
 
@@ -210,13 +214,16 @@ const TreeNode: React.FC<TreeNode> = (props) => {
     );
   }
   const ref = useRef<HTMLDivElement>(null);
-  const [{ isDragging }, drag] = useDrag({
+  const [{ isDragging }, drag, dragPreview] = useDrag(() => ({
     type: ItemType.TREE_NODE,
     item: { ...props },
     // item: { ...props.node },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
+    start: (draggedItem: any, monitor: DragSourceMonitor) => {
+      console.log("start", draggedItem, monitor);
+    },
     end(draggedItem, monitor: DragSourceMonitor) {
       if (monitor.didDrop()) {
         const dropResult = monitor.getDropResult();
@@ -227,12 +234,13 @@ const TreeNode: React.FC<TreeNode> = (props) => {
         }
       }
     },
-  });
+  }));
 
   const [{ isOver }, drop] = useDrop({
     accept: ItemType.TREE_NODE,
     drop: (draggeditem: TreeNode, monitor) => {
-      draggeditem = monitor.getItem();
+      console.log("draggedItem", draggeditem);
+      // draggeditem = monitor.getItem();
       const offSetDifference = monitor.getDifferenceFromInitialOffset()?.x;
       const scaffoldBlockPxWidth = draggeditem?.scaffoldBlockPxWidth || 44;
 
@@ -240,39 +248,46 @@ const TreeNode: React.FC<TreeNode> = (props) => {
       if (offSetDifference && scaffoldBlockPxWidth) {
         newDepth = Math.round(offSetDifference / scaffoldBlockPxWidth);
       }
+      console.log("newDepth: ", draggeditem.treeIndex + newDepth);
       if (!props.treeData) return;
 
-      const draggedItem = { ...draggeditem, newNode: true };
+      const isDroppedAsChild = newDepth > props.treeIndex;
+      const newNode = {
+        title: draggeditem.title,
+        subtitle: draggeditem.subtitle,
+        children: draggeditem.children,
+
+        newNode: true,
+        addAsChild: isDroppedAsChild,
+        expanded: draggeditem.expanded,
+      };
+
       let res = changeNodeAtPath({
         treeData: props.treeData,
         path: props.path,
-        newNode: draggedItem,
+        newNode: newNode,
       });
+      console.log("resorg", res);
+
       function getPrevIdx() {
-        console.log(
-          "draggeditem.treeIndex:",
-          draggeditem.treeIndex,
-          "props.treeIndex:",
-          props.treeIndex
-        );
-        if (
-          !isGreaterTreeDepth({
-            draggedItemPath: draggeditem.path,
-            targetItemPath: props.path,
-          })
-        ) {
+        const { isGreater, idx } = isGreaterTreeDepth({
+          draggedItemPath: draggeditem.path,
+          targetItemPath: props.path,
+        });
+        if (!isGreater) {
           return draggeditem.path;
         }
         const descendantCount = getDescendantCount({
-          node: draggedItem,
+          node: draggeditem,
           ignoreCollapsed: true,
         });
-        const addedNodePrevIdx = draggedItem.path.map(
-          (x) => x + 1 + descendantCount
+        const addedNodePrevIdx = draggeditem.path.map((x, i) =>
+          i >= idx ? x + 1 + descendantCount : x
         );
         return addedNodePrevIdx;
       }
       const addedNodePrevIdx = getPrevIdx();
+      console.log("addedNodePrevIdx: ", addedNodePrevIdx);
       res = changeNodeAtPath({
         treeData: res,
         path: addedNodePrevIdx,
@@ -289,33 +304,49 @@ const TreeNode: React.FC<TreeNode> = (props) => {
   });
   drop(ref);
   return (
-    <div
-      ref={ref}
-      style={{
-        display: "flex",
-        justifyItems: "flex-start",
-        alignItems: "center",
-      }}
-    >
-      {...blockoffset}
+    <>
       <div
-        ref={drag}
+        ref={ref}
+        key={props.path.join(".")}
         style={{
-          display: "inline-block",
-          minHeight: "50px",
-          backgroundColor: "gray",
-          border: "1px solid black",
-          borderRadius: 5,
-          padding: 10,
-          margin: 2,
-          opacity: isDragging ? 0.5 : 1,
+          display: "flex",
+          justifyItems: "flex-start",
+          alignItems: "center",
         }}
       >
-        {props.parent && <span> parent: {props.parent.title}</span>}
-        tilte:{props.title} - id:{props.id} - path:[{props.path.join(",")}] -
-        treeIndex: {props.treeIndex}
+        {...blockoffset}
+        {/* <DragPreviewImage connect={preview} src={""} /> */}
+
+        <div
+          ref={drag}
+          key={props.path.join(".")}
+          style={{
+            display: "inline-block",
+            minHeight: "50px",
+
+            background: "#f5ebe0",
+            border: "1px solid #d3c4f5",
+            borderRadius: 2,
+            padding: 6,
+            cursor: "move",
+            margin: 4,
+            opacity: isDragging ? 0.5 : 1,
+
+            outline: isOver
+              ? "4px dashed #48a363"
+              : isDragging
+              ? "4px solid #ba8f95"
+              : "none",
+            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+          }}
+        >
+          {props.parent && <span> parent:''' {props.parent.title}'''</span>}
+          tilte:[{props.title}] - id:[{props.id}] - path:[
+          {props.path.join(",")}] - treeIndex-{props.treeIndex}
+        </div>
+        <TreeDragLayer />
       </div>
-    </div>
+    </>
   );
 };
 
