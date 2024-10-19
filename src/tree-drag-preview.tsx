@@ -2,11 +2,12 @@ import type { CSSProperties, FC } from "react";
 import type { XYCoord } from "react-dnd";
 import { useDragLayer } from "react-dnd";
 
-import { BoxDragPreview } from "./BoxDragPreview";
-import { ItemType } from "./tree-node-render";
+import { ItemType } from "./types";
 import TreeNodeDragPreview from "./tree-node-dragpreview";
 
-export interface CustomTreeDragLayerProps {}
+export interface CustomTreeDragLayerProps {
+  style?: CSSProperties;
+}
 
 const layerStyles: CSSProperties = {
   position: "fixed",
@@ -48,7 +49,7 @@ const TreeDragLayer: FC<CustomTreeDragLayerProps> = (props) => {
   function renderItem() {
     switch (itemType) {
       case ItemType.TREE_NODE:
-        return <TreeNodeDragPreview {...item} />;
+        return <TreeNodeDragPreview {...item} style={props.style} />;
       default:
         return null;
     }

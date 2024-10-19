@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
-import { ItemType, TreeNode } from "./tree-node-render";
-import { useDrag, DragSourceMonitor, useDrop, XYCoord } from "react-dnd";
+import { useDrop } from "react-dnd";
+import { TreeNode, ItemType } from "./types";
 export type TreeNodeWrapProps = {
   children: React.ReactNode;
 
@@ -22,13 +22,10 @@ const DndWrapper: React.FC<TreeNodeWrapProps> = (props) => {
   const [{ isOver }, drop] = useDrop({
     accept: ItemType.TREE_NODE,
     drop: (item: TreeNode, monitor) => {
-      console.log("drop", item);
-
       let blocksOffset = Math.round(
         //@ts-ignore
         monitor.getDifferenceFromInitialOffset()?.x / 44
       );
-      console.log("blocksOffset", blocksOffset);
       return {
         node: item,
       };
@@ -45,11 +42,10 @@ const DndWrapper: React.FC<TreeNodeWrapProps> = (props) => {
     <div
       ref={ref}
       style={{
-        position: "relative",
-        backgroundColor: isOver ? "green" : "white",
+        overflow: "hidden",
+        backgroundColor: isOver ? "red" : "white",
       }}
     >
-      wrapper
       {props.children}
     </div>
   );

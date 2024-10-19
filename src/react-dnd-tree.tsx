@@ -1,26 +1,12 @@
 import { DndProvider, DndContext } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import TreeNode, { TreeNode as typeTreeNode } from "./tree-node-render";
+import TreeNode from "./tree-node-render";
+import { TreeNode as typeTreeNode } from "./types";
 import DndWrapper from "./wrapper";
-import { useState } from "react";
 
+import { getMaxDepth } from "./utils";
 export const defaultGetNodeKey = ({ treeIndex }: any) => treeIndex;
 
-const getMaxDepth = (treeData: typeTreeNode[]) => {
-  let maxDepth = 0;
-  const traverse = (node: typeTreeNode, depth: number) => {
-    if (node.children) {
-      node.children.forEach((child) => {
-        traverse(child, depth + 1);
-      });
-    }
-    maxDepth = Math.max(maxDepth, depth);
-  };
-  treeData.forEach((node) => {
-    traverse(node, 1);
-  });
-  return maxDepth;
-};
 const ReactDndTree: React.FC<ReactDndTreeProps> = (
   {
     treeData,
@@ -29,9 +15,8 @@ const ReactDndTree: React.FC<ReactDndTreeProps> = (
     canDrop = undefined,
     canNodeHaveChildren = () => true,
     className = "",
-    getNodeKey = (node: any) => node.id,
+    getNodeKey = ({ node }: { node: any }) => node.id,
     maxDepth = undefined,
-    onMoveNode = () => {},
     onVisibilityToggle = () => {},
     rowDirection = "ltr",
     style = {},
@@ -54,8 +39,10 @@ const ReactDndTree: React.FC<ReactDndTreeProps> = (
       <TreeNode
         key={path.join(".")}
         {...node}
+        children={node.children || []}
         treeIndex={treeIndex}
         id={idCount}
+        style={style}
         path={path}
         parent={parent}
         maxDepth={treeMaxDepth}
@@ -63,6 +50,7 @@ const ReactDndTree: React.FC<ReactDndTreeProps> = (
         canDrag={true}
         treeData={treeData}
         onChange={onChange}
+        className={className}
       />
     );
     if (node.children) {
@@ -76,7 +64,7 @@ const ReactDndTree: React.FC<ReactDndTreeProps> = (
     return nodes;
   };
   const treeMaxDepth = getMaxDepth(treeData);
-  const [treeDataState, setTreeDataState] = useState(null);
+  // const [treeDataState, setTreeDataState] = useState(null);
   return (
     <>
       <DndWrapper>

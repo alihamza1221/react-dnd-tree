@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import DndTree from "../index.ts";
-// In your own app, you would need to use import styles once in the app
 // import 'react-sortable-tree/styles.css';
 
 const data = [
@@ -60,21 +59,33 @@ const data = [
   },
 ];
 
+const customStyle: React.CSSProperties = {
+  width: "400px",
+  font: "Arial",
+  fontSize: "20px",
+  backgroundColor: "lightyellow",
+  border: "1px solid black",
+  borderRadius: "2px",
+  padding: "3px",
+  margin: "5px",
+  display: "flex",
+  justifyContent: "start",
+};
 const Barebones: React.FC = () => {
   const [treeData, setTreeData] = useState(data);
 
   return (
     <div
       style={{
-        width: "600px",
-        height: "700px",
         overflow: "scroll",
         margin: "auto",
         border: "1px solid #888",
         padding: "10px",
+        width: "700px",
+        height: "600px",
       }}
     >
-      <DndTree treeData={treeData} onChange={setTreeData} />
+      <DndTree treeData={treeData} onChange={setTreeData} style={customStyle} />
     </div>
   );
 };
